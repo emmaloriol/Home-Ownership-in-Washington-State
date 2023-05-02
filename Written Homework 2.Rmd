@@ -1,0 +1,178 @@
+---
+title: "Written Homework 2"
+author: "Emma"
+date: "2023-04-20"
+output: 
+  pdf_document: default
+---
+
+```{r}
+#Import necessary libraries
+library(tidyverse)
+library(e1071)
+library(ISLR2)
+library(dplyr)
+```
+
+Read in data
+```{r}
+load("Housing.Rdata") #load data
+glimpse(data) #preview data
+```
+
+Select oldest household member and only married couples
+```{r}
+# Group by SERIAL, then select the oldest person in each group
+df <- data %>%
+  group_by(SERIAL) %>%
+  filter(AGE == max(AGE)) %>%
+  ungroup()
+
+
+#Subset data so only married couples
+df <- df %>%
+  filter(MARST == 1)
+
+```
+
+Data cleaning
+```{r}
+df= na.omit(df) #remove na values
+df = data.frame(df) #set as data frame
+df$isOwned = as.factor((df$OWNERSHP == 1) * 1) #create a binary owned/not owned variable
+#glimpse(df) #confirm new variable
+
+```
+#Linear model <br>
+Create training and test set
+```{r}
+set.seed(1) #set seed for consistent resampling
+sample_size = floor(0.01*nrow(df)) #sample size for training data set
+picked = sample(seq_len(nrow(df)),size = sample_size) #sample 1% of data
+train =df[picked,] #set 1% of data for training
+test = df[-picked, ]
+test = test[sample(nrow(test), 180), ] #same size as training set
+
+```
+
+Build and tune linear model
+```{r}
+set.seed(2)
+model1 <- tune(svm, isOwned ~ HHINCOME  + AGE, data = train, kernel = "linear", ranges = list(cost = c(.00001, 0.01, 1,5, 10, 100, 1000))) #Linear support vector classifier testing different values of cost
+summary(model1) 
+```
+Training and testing error rate
+
+```{r}
+optimalmodel1 <- model1$best.model #Select model with lowest error
+optimalmodel1$cost #1e-05 = cost
+
+#Training error rate
+ypred <- predict(optimalmodel1, train) #predict training values
+tab <- table(predict = ypred, truth = train$isOwned) #compare to actual values
+tab
+(tab[2] + tab[3] )/ (tab[1] + tab[2] + tab[3] + tab[4]) #13.3% error rate. Only predicted 1. 
+
+#test error rate
+ypred <- predict(optimalmodel1, test) #predict test values
+tab <- table(predict = ypred, truth = test$isOwned) #compare to actual values
+(tab[2] + tab[3] )/ (tab[1] + tab[2] + tab[3] + tab[4]) #15% error rate. Only predicted 1.
+tab
+```
+Examine coefficients of model
+```{r}
+w = t(optimalmodel1$coefs) %*% optimalmodel1$SV #Save coefficients for each predictor
+w #print coefficients
+
+```
+
+#Radial Model <br>
+
+More data cleaning
+```{r}
+df2 <- subset(df, select = -c(OWNERSHP, OWNERSHPD, MARST, SERIAL)) #remove variables not meaningful for prediction
+```
+
+Training and test data selection
+
+```{r}
+set.seed(4) #set seed for consistent resampling
+sample_size = floor(0.01*nrow(df2)) #sample size for training data set
+picked = sample(seq_len(nrow(df2)),size = sample_size) #sample 1% of data
+train =df2[picked,] #set 1% of data for training
+test = df2[-picked, ]
+test = test[sample(nrow(test), 180), ] #same size as training set
+
+```
+
+```{r}
+set.seed(3) #set seed for consistent resampling
+model2 <- tune(svm, isOwned ~ ., data = train, kernel = "radial", ranges = list(cost = c(0.1, 1, 10, 100, 1000, 10000), gamma = c(0.00001, 0.0001, 0.001, 0.01, 0.1, 1))) #Support vector classifier testing different values of cost
+summary(model2)
+optimalmodel2 <- model2$best.model #select model with lowest error rate
+optimalmodel2$cost #1000 = cost
+optimalmodel2$gamma #1e-05 = gamme
+```
+
+Training and testing error rate
+```{r}
+#training error prediction
+ypred <- predict(optimalmodel2, train) #predict values
+tab <- table(predict = ypred, truth = train$isOwned) #compare to actual values
+tab
+(tab[2] + tab[3] )/ (tab[1] + tab[2] + tab[3] + tab[4]) #11.7% error rate
+
+#test error rate
+ypred <- predict(optimalmodel2, test) #predict values
+tab <- table(predict = ypred, truth = test$isOwned) #compare to actual values
+(tab[2] + tab[3] )/ (tab[1] + tab[2] + tab[3] + tab[4]) #13.5% error rate
+```
+Coefficients of predictor variables
+```{r}
+w = t(optimalmodel2$coefs) %*% optimalmodel2$SV #extract coefficients
+w #print coefficients
+```
+Plots
+```{r}
+plot(optimalmodel2, df2, NFAMS ~ BEDROOMS) #plot nfams and bedrooms
+```
+
+#Polynomial model <br>
+
+Build and tune model
+
+```{r}
+set.seed(5) #set seed for consistency
+model3 <- tune(svm, isOwned ~ VEHICLES + HHINCOME + DENSITY + AGE, data = train, kernel = "polynomial", ranges = list(cost = c(0.1, 1, 10, 100, 1000, 10000), degree = c(1, 2, 3, 4))) #Polynomial support vector classifier testing different values of cost and degree
+summary(model3)
+optimalmodel3 <- model3$best.model #select optimal model
+optimalmodel3$cost #10 = cost
+optimalmodel3$degree #1 = degree
+```
+
+Training and testing error rate
+```{r}
+#Training error rate
+ypred <- predict(optimalmodel3, train) #training data predictions
+tab <- table(predict = ypred, truth = train$isOwned) #compare to actual values
+tab
+(tab[2] + tab[3] )/ (tab[1] + tab[2] + tab[3] + tab[4]) #12.8% error rate
+
+#test error rate
+ypred <- predict(optimalmodel3, test) #test error predictions
+tab <- table(predict = ypred, truth = test$isOwned) #compare to actual value
+tab
+(tab[2] + tab[3] )/ (tab[1] + tab[2] + tab[3] + tab[4])
+(7 + 14)/ (10 + 7 + 14 + 149) #12.8% error rate
+```
+Coefficients of predictors
+```{r}
+w = t(optimalmodel3$coefs) %*% optimalmodel3$SV #obtain coefficients of predictor variables
+w #print coefficients
+```
+```{r}
+
+plot(optimalmodel3, df2, HHINCOME ~ AGE) #classification plot for hhincome and age
+```
+
+
