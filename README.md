@@ -1,2 +1,2 @@
 # Home-Ownership-in-Washington-State
-I use the IPUMS (Integrated Public Use Microdata Series) census data to predict renting/ownership status among married people in Washington state.
+I use the IPUMS (Integrated Public Use Microdata Series) census data to predict renting/ownership status among married people in Washington state. Variables related to socioeconomic status and demographics of residents are used to build various support vector models that classify home ownership status. The results of these models can be used to better understand factors influencing home ownership and inform policy to improve affordable housing in Washington state. 
